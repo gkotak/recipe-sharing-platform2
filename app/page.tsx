@@ -1,10 +1,23 @@
 import { Button } from "@/components/ui/button"
 import { Search } from "lucide-react"
-import { RecipeGrid } from "@/components/recipe-grid"
+import { createServerClient } from "@/lib/supabase/server"
 
-export default function Home() {
+export default async function Home() {
+  const supabase = createServerClient()
+
+  // Test Supabase connection by fetching profiles count
+  const { data: profilesCount, error: profilesError } = await supabase
+    .from('profiles')
+    .select('*', { count: 'exact', head: true })
+
+  // Test recipes table connection
+  const { data: recipesCount, error: recipesError } = await supabase
+    .from('recipes')
+    .select('*', { count: 'exact', head: true })
+
   return (
     <div className="flex flex-col min-h-screen">
+
       {/* Hero Section */}
       <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48 bg-background">
         <div className="container px-4 md:px-6">
@@ -53,17 +66,6 @@ export default function Home() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* Latest Recipes */}
-      <section className="w-full py-12 md:py-24">
-        <div className="container px-4 md:px-6">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-bold tracking-tighter">Latest Recipes</h2>
-            <Button variant="outline">View All</Button>
-          </div>
-          <RecipeGrid />
         </div>
       </section>
     </div>
