@@ -1,37 +1,84 @@
-export type Profile = {
-  id: string
-  username: string
-  full_name: string
-  created_at: string
-  updated_at: string
-}
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
-export type Recipe = {
-  id: string
-  created_at: string
-  user_id: string
-  title: string
-  ingredients: string
-  instructions: string
-  cooking_time: number
-  difficulty: string
-  category: string
-  description: string
-}
-
-export type Database = {
+export interface Database {
   public: {
     Tables: {
       profiles: {
-        Row: Profile
-        Insert: Omit<Profile, 'created_at' | 'updated_at'>
-        Update: Partial<Omit<Profile, 'id' | 'created_at' | 'updated_at'>>
+        Row: {
+          id: string
+          username: string | null
+          full_name: string | null
+          bio: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          username?: string | null
+          full_name?: string | null
+          bio?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          username?: string | null
+          full_name?: string | null
+          bio?: string | null
+          created_at?: string
+          updated_at?: string
+        }
       }
       recipes: {
-        Row: Recipe
-        Insert: Omit<Recipe, 'id' | 'created_at'>
-        Update: Partial<Omit<Recipe, 'id' | 'created_at'>>
+        Row: {
+          id: number
+          created_at: string
+          user_id: string
+          title: string
+          description: string | null
+          ingredients: string[]
+          cooking_time: number
+          difficulty: string
+          category: string
+        }
+        Insert: {
+          id?: number
+          created_at?: string
+          user_id: string
+          title: string
+          description?: string | null
+          ingredients: string[]
+          cooking_time: number
+          difficulty: string
+          category: string
+        }
+        Update: {
+          id?: number
+          created_at?: string
+          user_id?: string
+          title?: string
+          description?: string | null
+          ingredients?: string[]
+          cooking_time?: number
+          difficulty?: string
+          category?: string
+        }
       }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
     }
   }
 }

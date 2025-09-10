@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation'
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import AuthForm from '@/components/auth/auth-form'
 
-export default async function SignIn() {
-  const supabase = createServerClient()
+export default async function SignInPage() {
+  const supabase = createClient()
 
   const { data: { session } } = await supabase.auth.getSession()
   if (session) {
@@ -11,16 +11,12 @@ export default async function SignIn() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center py-2">
-      <div className="w-full max-w-md space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight">
-            Sign in to your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            Enter your email to receive a magic link
-          </p>
-        </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-md mx-auto">
+        <h1 className="text-3xl font-bold text-center">Welcome Back</h1>
+        <p className="text-muted-foreground text-center mt-2">
+          Sign in to your account to continue
+        </p>
         <AuthForm />
       </div>
     </div>

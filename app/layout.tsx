@@ -5,7 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import SupabaseProvider from "@/components/providers/supabase-provider";
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,7 +19,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const supabase = createServerClient();
+  const supabase = createClient();
 
   const {
     data: { session },
@@ -37,9 +37,7 @@ export default async function RootLayout({
           >
             <div className="relative flex min-h-screen flex-col">
               <Navbar />
-              <main className="flex-1">
-                {children}
-              </main>
+              <main className="flex-1">{children}</main>
               <Footer />
             </div>
           </ThemeProvider>

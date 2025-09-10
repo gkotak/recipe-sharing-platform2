@@ -1,9 +1,9 @@
-"use client"
+'use client'
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
-import { Search } from "lucide-react"
+import { Search, User } from "lucide-react"
 import { useSupabase } from "@/components/providers/supabase-provider"
 import { useRouter } from "next/navigation"
 
@@ -39,11 +39,19 @@ export default function Navbar() {
           <ModeToggle />
           {session ? (
             <>
-              <span className="text-sm font-medium">
+              <Button variant="ghost" size="icon" asChild>
+                <Link href="/profile">
+                  <User className="h-5 w-5" />
+                </Link>
+              </Button>
+              <Link 
+                href="/profile" 
+                className="text-sm font-medium hover:text-primary transition-colors"
+              >
                 {session.user.user_metadata.first_name}
-              </span>
+              </Link>
               <Button variant="default" asChild>
-                <Link href="/create">Share Recipe</Link>
+                <Link href="/dashboard">My Recipes</Link>
               </Button>
               <Button variant="outline" onClick={handleSignOut}>
                 Sign Out
