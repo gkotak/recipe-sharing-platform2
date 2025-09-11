@@ -69,26 +69,26 @@ export default async function RecipeDetailsPage({
 
   const likedByUser = !!userLike
 
-  // Fetch comments for this recipe (newest-first), tolerant to table name variations
+  // Fetch comments directly - RLS should allow public read access
   let comments: any[] = []
   let commentsTableUsed: string | null = null
-  {
-    const tryTables = ['comments', 'recipe_comments']
-    for (const tbl of tryTables) {
-      const { data, error } = await supabase
-        .from(tbl as any)
-        .select('id, content, created_at, user_id, recipe_id')
-        .eq('recipe_id', recipe.id)
-        .order('created_at', { ascending: false })
-      if (!error && data) {
-        comments = data as any[]
-        commentsTableUsed = tbl
-        break
-      }
+  
+  const tryTables = ['comments', 'recipe_comments']
+  for (const tbl of tryTables) {
+    const { data, error } = await supabase
+      .from(tbl as any)
+      .select('id, content, created_at, user_id, recipe_id')
+      .eq('recipe_id', recipe.id)
+      .order('created_at', { ascending: false })
+    
+    if (!error && data) {
+      comments = data as any[]
+      commentsTableUsed = tbl
+      break
     }
   }
 
-  // Best-effort fetch of commenter names without relying on FK embed
+  // Fetch commenter names
   let userIdToName: Record<string, string> = {}
   if (comments.length > 0) {
     const userIds = Array.from(new Set(comments.map((c: any) => c.user_id).filter(Boolean)))
@@ -97,6 +97,7 @@ export default async function RecipeDetailsPage({
         .from('profiles')
         .select('id, full_name')
         .in('id', userIds)
+      
       if (profilesData) {
         userIdToName = Object.fromEntries(profilesData.map((p: any) => [p.id, p.full_name || 'Unknown']))
       }
@@ -258,13 +259,6 @@ export default async function RecipeDetailsPage({
             action={toggleLike}
             isAuthenticated={!!user}
           />
-          {/* Debug button */}
-          <form action={toggleLike}>
-            <input type="hidden" name="recipe_id" value={recipe.id} />
-            <button type="submit" className="px-4 py-2 bg-red-500 text-white rounded">
-              Test Like (Debug)
-            </button>
-          </form>
         </div>
 
         {/* Recipe Image */}
@@ -331,6 +325,8 @@ export default async function RecipeDetailsPage({
           <div className="mb-6">
             <CommentForm onSubmit={addComment} recipeId={String(recipe.id)} isAuthenticated={!!user} />
           </div>
+          
+          
           <div className="space-y-4">
             {comments?.length ? (
               comments.map((c: any) => (
