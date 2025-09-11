@@ -195,39 +195,30 @@ export default async function RecipeDetailsPage({
   // Server action: add comment
   async function addComment(formData: FormData) {
     'use server'
-    try {
-      const supabaseServer = createClient()
-      const actionUser = await requireAuth(AUTH_MESSAGES.LIKE_REQUIRED)
-      const recipeId = String(formData.get('recipe_id') || '')
-      const content = String(formData.get('content') || '').trim()
-      
-      console.log('Comment submission:', { recipeId, content, userId: actionUser.id })
-      
-      if (!recipeId || !content) {
-        throw new Error('Recipe ID and content are required')
-      }
-      
-      const success = await tryTableVariationsMutation(
-        supabaseServer,
-        'comments',
-        async (tableName) => {
-          console.log('Inserting comment into table:', tableName)
-          return await supabaseServer
-            .from(tableName as any)
-            .insert({ recipe_id: recipeId, user_id: actionUser.id, content } as any)
-        }
-      )
-
-      if (!success) {
-        throw new Error('Failed to insert comment')
-      }
-
-      console.log('Comment inserted successfully')
-      revalidatePath(`/recipes/${params.id}`)
-    } catch (error) {
-      console.error('Error in addComment:', error)
-      throw error
+    const supabaseServer = createClient()
+    const actionUser = await requireAuth(AUTH_MESSAGES.LIKE_REQUIRED)
+    const recipeId = String(formData.get('recipe_id') || '')
+    const content = String(formData.get('content') || '').trim()
+    
+    if (!recipeId || !content) {
+      throw new Error('Recipe ID and content are required')
     }
+    
+    const success = await tryTableVariationsMutation(
+      supabaseServer,
+      'comments',
+      async (tableName) => {
+        return await supabaseServer
+          .from(tableName as any)
+          .insert({ recipe_id: recipeId, user_id: actionUser.id, content } as any)
+      }
+    )
+
+    if (!success) {
+      throw new Error('Failed to insert comment')
+    }
+
+    revalidatePath(`/recipes/${params.id}`)
   }
 
   // Server action: delete own comment
