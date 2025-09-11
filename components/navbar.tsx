@@ -24,11 +24,8 @@ export default function Navbar() {
             RecipeShare
           </Link>
           <div className="hidden md:flex space-x-6">
-            <Link href="/recipes" className="text-sm font-medium transition-colors hover:text-primary">
+            <Link href="/browse" className="text-sm font-medium transition-colors hover:text-primary">
               Browse
-            </Link>
-            <Link href="/tags" className="text-sm font-medium transition-colors hover:text-primary">
-              Tags
             </Link>
           </div>
         </div>

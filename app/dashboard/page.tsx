@@ -4,25 +4,13 @@ import RecipeGrid from '@/components/recipe-grid'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { PlusCircle } from 'lucide-react'
+import { Suspense } from 'react'
+import { RecipeGridSkeleton } from '@/components/skeletons/recipe-grid-skeleton'
 
 export default async function DashboardPage() {
-  // First verify our environment variables
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-red-500 font-medium">Configuration Error</p>
-          <p className="text-sm text-red-400 mt-2">
-            Missing Supabase configuration. Please check your environment variables.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  const supabase = createClient()
 
   try {
-    const supabase = createClient()
-
     // Check authentication first
     const { data: { session }, error: authError } = await supabase.auth.getSession()
     
@@ -67,16 +55,18 @@ export default async function DashboardPage() {
           </Button>
         </div>
 
-        {!recipes || recipes.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-lg text-muted-foreground">No recipes have been shared yet.</p>
-            <Button asChild className="mt-4">
-              <Link href="/recipes/create">Share Your First Recipe</Link>
-            </Button>
-          </div>
-        ) : (
-          <RecipeGrid recipes={recipes} />
-        )}
+        <Suspense fallback={<RecipeGridSkeleton />}>
+          {!recipes || recipes.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-lg text-muted-foreground">No recipes have been shared yet.</p>
+              <Button asChild className="mt-4">
+                <Link href="/recipes/create">Share Your First Recipe</Link>
+              </Button>
+            </div>
+          ) : (
+            <RecipeGrid recipes={recipes} />
+          )}
+        </Suspense>
       </div>
     )
   } catch (error) {
@@ -84,11 +74,6 @@ export default async function DashboardPage() {
       error,
       message: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
-      env: {
-        hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        url: process.env.NEXT_PUBLIC_SUPABASE_URL
-      }
     })
 
     // For any error, redirect to home page

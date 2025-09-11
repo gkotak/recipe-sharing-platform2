@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useSupabase } from './providers/supabase-provider'
+import { CategorySelect } from './category-select'
+import { RecipeCategory } from '@/lib/constants/categories'
 
 export default function RecipeForm() {
   const router = useRouter()
@@ -17,7 +19,8 @@ export default function RecipeForm() {
     ingredients: [''],
     cooking_time: '',
     difficulty: 'easy',
-    category: '',
+
+    category: 'other' as RecipeCategory,
   })
 
   const handleIngredientChange = (index: number, value: string) => {
@@ -202,13 +205,10 @@ export default function RecipeForm() {
           <label htmlFor="category" className="block text-sm font-medium mb-2">
             Category
           </label>
-          <input
-            id="category"
-            type="text"
-            required
+          <CategorySelect
             value={formData.category}
-            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-            className="w-full rounded-md border-0 py-1.5 px-3 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-300 dark:ring-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary bg-transparent"
+            onValueChange={(value) => setFormData({ ...formData, category: value as RecipeCategory })}
+            className="w-full"
           />
         </div>
       </div>

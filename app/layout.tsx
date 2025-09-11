@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import SupabaseProvider from "@/components/providers/supabase-provider";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -19,11 +20,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const supabase = createClient();
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
 
   return (
     <html lang="en" suppressHydrationWarning>

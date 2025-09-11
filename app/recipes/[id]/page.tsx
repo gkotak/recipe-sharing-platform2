@@ -4,6 +4,12 @@ import { formatDistanceToNow } from 'date-fns'
 import { Clock, ChefHat, Utensils } from 'lucide-react'
 import { searchRecipeImage } from '@/lib/unsplash'
 import Image from 'next/image'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { redirect } from 'next/navigation'
+import DeleteRecipeButton from '@/components/delete-recipe-button'
+import LikeButton from '@/components/like-button'
+import CommentForm from '@/components/comment-form'
 
 export default async function RecipeDetailsPage({
   params
@@ -28,6 +34,118 @@ export default async function RecipeDetailsPage({
     notFound()
   }
 
+  // Determine ownership
+  const { data: { user } } = await supabase.auth.getUser()
+  const isOwner = !!user && user.id === recipe.user_id
+
+  // Likes: count + whether current user liked
+  const [{ count: likeCount }, { data: userLike }] = await Promise.all([
+    supabase
+      .from('recipe_likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('recipe_id', recipe.id),
+    user
+      ? supabase
+          .from('recipe_likes')
+          .select('recipe_id')
+          .eq('recipe_id', recipe.id)
+          .eq('user_id', user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null } as any)
+  ])
+
+  const likedByUser = !!userLike
+
+  // Fetch comments for this recipe (simple newest-first)
+  const { data: comments } = await supabase
+    .from('comments')
+    .select(`id, content, created_at, user_id, profiles: user_id ( full_name )`)
+    .eq('recipe_id', recipe.id)
+    .order('created_at', { ascending: false })
+
+  // Server action to delete a recipe (owner-only)
+  async function deleteRecipe(formData: FormData) {
+    'use server'
+    const supabaseServer = createClient()
+    const { data: { user: actionUser } } = await supabaseServer.auth.getUser()
+    const recipeId = formData.get('recipe_id')
+
+    if (!actionUser || !recipeId) {
+      redirect(`/recipes/${params.id}`)
+    }
+
+    const { error: deleteError } = await supabaseServer
+      .from('recipes')
+      .delete()
+      .eq('id', recipeId)
+      .eq('user_id', actionUser.id)
+
+    if (deleteError) {
+      console.error('Delete error:', deleteError)
+      redirect(`/recipes/${params.id}?error=cannot_delete`)
+    }
+
+    redirect('/dashboard')
+  }
+
+  // Server action to toggle like
+  async function toggleLike(formData: FormData) {
+    'use server'
+    const supabaseServer = createClient()
+    const { data: { user: actionUser } } = await supabaseServer.auth.getUser()
+    const recipeId = String(formData.get('recipe_id') || '')
+    if (!actionUser || !recipeId) {
+      return
+    }
+
+    const { data: existing } = await supabaseServer
+      .from('recipe_likes')
+      .select('recipe_id')
+      .eq('recipe_id', recipeId)
+      .eq('user_id', actionUser.id)
+      .maybeSingle()
+
+    if (existing) {
+      await supabaseServer
+        .from('recipe_likes')
+        .delete()
+        .eq('recipe_id', recipeId)
+        .eq('user_id', actionUser.id)
+    } else {
+      await supabaseServer
+        .from('recipe_likes')
+        .insert({ recipe_id: recipeId, user_id: actionUser.id })
+    }
+  }
+
+  // Server action: add comment
+  async function addComment(formData: FormData) {
+    'use server'
+    const supabaseServer = createClient()
+    const { data: { user: actionUser } } = await supabaseServer.auth.getUser()
+    const recipeId = String(formData.get('recipe_id') || '')
+    const content = String(formData.get('content') || '').trim()
+    if (!actionUser || !recipeId || !content) return
+    await supabaseServer
+      .from('comments')
+      .insert({ recipe_id: recipeId, user_id: actionUser.id, content })
+    // no redirect; client can rely on revalidation when navigating back or manual refresh
+  }
+
+  // Server action: delete own comment
+  async function deleteComment(formData: FormData) {
+    'use server'
+    const supabaseServer = createClient()
+    const { data: { user: actionUser } } = await supabaseServer.auth.getUser()
+    const commentId = String(formData.get('comment_id') || '')
+    if (!actionUser || !commentId) return
+    await supabaseServer
+      .from('comments')
+      .delete()
+      .eq('id', commentId)
+      .eq('user_id', actionUser.id)
+  }
+
   const timeAgo = formatDistanceToNow(new Date(recipe.created_at), { addSuffix: true })
   
   // Search for a relevant image based on recipe title and description
@@ -39,15 +157,37 @@ export default async function RecipeDetailsPage({
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-4">{recipe.title}</h1>
-          <div className="flex items-center text-muted-foreground mb-4">
-            <span>By {recipe.profiles?.full_name || 'Unknown'}</span>
-            <span className="mx-2">•</span>
-            <span>{timeAgo}</span>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-4xl font-bold mb-4">{recipe.title}</h1>
+              <div className="flex items-center text-muted-foreground mb-4">
+                <span>By {recipe.profiles?.full_name || 'Unknown'}</span>
+                <span className="mx-2">•</span>
+                <span>{timeAgo}</span>
+              </div>
+            </div>
+            {isOwner && (
+              <div className="flex items-center gap-2">
+                <Link href={`/recipes/create?edit=${recipe.id}`}>
+                  <Button variant="outline">Edit</Button>
+                </Link>
+                <DeleteRecipeButton recipeId={recipe.id} action={deleteRecipe} />
+              </div>
+            )}
           </div>
           {recipe.description && (
             <p className="text-lg text-muted-foreground">{recipe.description}</p>
           )}
+        </div>
+
+        {/* Actions + Image */}
+        <div className="mb-4 flex items-center justify-between">
+          <LikeButton
+            recipeId={String(recipe.id)}
+            initialLiked={likedByUser}
+            initialCount={likeCount ?? 0}
+            action={toggleLike}
+          />
         </div>
 
         {/* Recipe Image */}
@@ -92,7 +232,7 @@ export default async function RecipeDetailsPage({
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-4">Ingredients</h2>
           <ul className="list-disc list-inside space-y-2">
-            {recipe.ingredients.map((ingredient, index) => (
+            {recipe.ingredients.map((ingredient: string, index: number) => (
               <li key={index} className="text-lg">{ingredient}</li>
             ))}
           </ul>
@@ -107,6 +247,40 @@ export default async function RecipeDetailsPage({
             </div>
           </div>
         )}
+
+        {/* Comments */}
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold mb-4">Comments</h2>
+          {user && (
+            <div className="mb-6">
+              <CommentForm onSubmit={addComment} recipeId={String(recipe.id)} />
+            </div>
+          )}
+          <div className="space-y-4">
+            {comments?.length ? (
+              comments.map((c: any) => (
+                <div key={c.id} className="rounded-lg border p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                      <span>{c.profiles?.full_name || 'Unknown'}</span>
+                      <span className="mx-2">•</span>
+                      <span>{formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}</span>
+                    </div>
+                    {user?.id === c.user_id && (
+                      <form action={deleteComment}>
+                        <input type="hidden" name="comment_id" value={c.id} />
+                        <Button variant="outline" size="sm">Delete</Button>
+                      </form>
+                    )}
+                  </div>
+                  <p className="mt-2 whitespace-pre-wrap">{c.content}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-muted-foreground">No comments yet. Be the first to comment!</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

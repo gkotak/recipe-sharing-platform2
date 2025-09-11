@@ -37,7 +37,7 @@ export interface Database {
       }
       recipes: {
         Row: {
-          id: number
+          id: string
           created_at: string
           user_id: string
           title: string
@@ -48,7 +48,7 @@ export interface Database {
           category: string
         }
         Insert: {
-          id?: number
+          id?: string
           created_at?: string
           user_id: string
           title: string
@@ -59,7 +59,7 @@ export interface Database {
           category: string
         }
         Update: {
-          id?: number
+          id?: string
           created_at?: string
           user_id?: string
           title?: string
