@@ -18,16 +18,14 @@ export default function LikeButton({ recipeId, initialLiked, initialCount, actio
 
   return (
     <form
-      action={(fd: FormData) => {
-        if (!isAuthenticated) {
-          // Let the server action handle the redirect
-          return
+      action={async (fd: FormData) => {
+        console.log('LikeButton form submitted, isAuthenticated:', isAuthenticated)
+        if (isAuthenticated) {
+          // optimistic update only for authenticated users
+          setState({ liked: !state.liked, count: state.liked ? state.count - 1 : state.count + 1 })
         }
-        // optimistic update
-        setState({ liked: !state.liked, count: state.liked ? state.count - 1 : state.count + 1 })
-        startTransition(async () => {
-          await action(fd)
-        })
+        // Always call the server action - it will handle redirect for unauthenticated users
+        await action(fd)
       }}
       className="inline-flex items-center gap-2"
     >

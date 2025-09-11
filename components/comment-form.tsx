@@ -15,18 +15,16 @@ export default function CommentForm({ onSubmit, recipeId, isAuthenticated }: Com
 
   return (
     <form
-      action={(fd: FormData) => {
+      action={async (fd: FormData) => {
+        console.log('CommentForm submitted, isAuthenticated:', isAuthenticated, 'content:', content)
         if (!content.trim()) return
-        if (!isAuthenticated) {
-          // Let the server action handle the redirect
-          return
-        }
-        startTransition(async () => {
-          fd.set('recipe_id', recipeId)
-          fd.set('content', content)
-          await onSubmit(fd)
+        // Always call the server action - it will handle redirect for unauthenticated users
+        fd.set('recipe_id', recipeId)
+        fd.set('content', content)
+        await onSubmit(fd)
+        if (isAuthenticated) {
           setContent('')
-        })
+        }
       }}
       className="space-y-2"
     >

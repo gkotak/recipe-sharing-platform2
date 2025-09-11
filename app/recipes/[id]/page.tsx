@@ -131,10 +131,13 @@ export default async function RecipeDetailsPage({
   // Server action to toggle like
   async function toggleLike(formData: FormData) {
     'use server'
+    console.log('toggleLike server action called')
     const supabaseServer = createClient()
     const { data: { user: actionUser } } = await supabaseServer.auth.getUser()
     const recipeId = String(formData.get('recipe_id') || '')
+    console.log('toggleLike - user:', !!actionUser, 'recipeId:', recipeId)
     if (!actionUser || !recipeId) {
+      console.log('redirecting to sign-in')
       redirect('/auth/sign-in?message=You need to be logged in to like or review a recipe')
     }
 
@@ -170,11 +173,14 @@ export default async function RecipeDetailsPage({
   // Server action: add comment
   async function addComment(formData: FormData) {
     'use server'
+    console.log('addComment server action called')
     const supabaseServer = createClient()
     const { data: { user: actionUser } } = await supabaseServer.auth.getUser()
     const recipeId = String(formData.get('recipe_id') || '')
     const content = String(formData.get('content') || '').trim()
+    console.log('addComment - user:', !!actionUser, 'recipeId:', recipeId, 'content:', content)
     if (!actionUser || !recipeId || !content) {
+      console.log('redirecting to sign-in')
       redirect('/auth/sign-in?message=You need to be logged in to like or review a recipe')
     }
     // Try common table names
@@ -252,6 +258,13 @@ export default async function RecipeDetailsPage({
             action={toggleLike}
             isAuthenticated={!!user}
           />
+          {/* Debug button */}
+          <form action={toggleLike}>
+            <input type="hidden" name="recipe_id" value={recipe.id} />
+            <button type="submit" className="px-4 py-2 bg-red-500 text-white rounded">
+              Test Like (Debug)
+            </button>
+          </form>
         </div>
 
         {/* Recipe Image */}
