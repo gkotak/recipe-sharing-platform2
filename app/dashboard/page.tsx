@@ -33,25 +33,36 @@ export default async function DashboardPage() {
 
     if (ownErr) throw new Error(`Own recipes error: ${ownErr.message}`)
 
-    // 2) Recipes the user liked (if likes table exists)
-    const { data: likedRows, error: likesErr } = await supabase
-      .from('likes')
-      .select('recipe_id')
-      .eq('user_id', userId)
-
-    if (likesErr && likesErr.code !== '42P01') {
-      // 42P01: relation does not exist. Ignore if table missing.
-      throw new Error(`Likes fetch error: ${likesErr.message}`)
+    // 2) Recipes the user liked (check possible table names)
+    let likedRows: { recipe_id: string }[] | null = null
+    {
+      const tryTables = ['likes', 'recipe_likes']
+      for (const tbl of tryTables) {
+        const { data, error } = await supabase
+          .from(tbl as any)
+          .select('recipe_id')
+          .eq('user_id', userId)
+        if (!error) {
+          likedRows = data as any
+          break
+        }
+      }
     }
 
-    // 3) Recipes the user commented on (if comments table exists)
-    const { data: commentRows, error: commentsErr } = await supabase
-      .from('comments')
-      .select('recipe_id')
-      .eq('user_id', userId)
-
-    if (commentsErr && commentsErr.code !== '42P01') {
-      throw new Error(`Comments fetch error: ${commentsErr.message}`)
+    // 3) Recipes the user commented on (check possible table names)
+    let commentRows: { recipe_id: string }[] | null = null
+    {
+      const tryTables = ['comments', 'recipe_comments']
+      for (const tbl of tryTables) {
+        const { data, error } = await supabase
+          .from(tbl as any)
+          .select('recipe_id')
+          .eq('user_id', userId)
+        if (!error) {
+          commentRows = data as any
+          break
+        }
+      }
     }
 
     const ownIds = (ownRecipes || []).map(r => r.id)
