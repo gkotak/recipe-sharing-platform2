@@ -2,7 +2,11 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AuthForm from '@/components/auth/auth-form'
 
-export default async function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: { message?: string }
+}) {
   const supabase = createClient()
 
   const { data: { session } } = await supabase.auth.getSession()
@@ -17,6 +21,13 @@ export default async function SignInPage() {
         <p className="text-muted-foreground text-center mt-2">
           Sign in to your account to continue
         </p>
+        {searchParams.message && (
+          <div className="mt-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/10 text-center">
+            <p className="text-sm text-blue-600 dark:text-blue-300">
+              {searchParams.message}
+            </p>
+          </div>
+        )}
         <AuthForm />
       </div>
     </div>

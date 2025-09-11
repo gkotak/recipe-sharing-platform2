@@ -9,15 +9,20 @@ type LikeButtonProps = {
   initialLiked: boolean
   initialCount: number
   action: (formData: FormData) => Promise<void>
+  isAuthenticated: boolean
 }
 
-export default function LikeButton({ recipeId, initialLiked, initialCount, action }: LikeButtonProps) {
+export default function LikeButton({ recipeId, initialLiked, initialCount, action, isAuthenticated }: LikeButtonProps) {
   const [isPending, startTransition] = useTransition()
   const [state, setState] = useOptimistic({ liked: initialLiked, count: initialCount }, (prev) => prev)
 
   return (
     <form
       action={(fd: FormData) => {
+        if (!isAuthenticated) {
+          // Let the server action handle the redirect
+          return
+        }
         // optimistic update
         setState({ liked: !state.liked, count: state.liked ? state.count - 1 : state.count + 1 })
         startTransition(async () => {

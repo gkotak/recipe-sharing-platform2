@@ -135,7 +135,7 @@ export default async function RecipeDetailsPage({
     const { data: { user: actionUser } } = await supabaseServer.auth.getUser()
     const recipeId = String(formData.get('recipe_id') || '')
     if (!actionUser || !recipeId) {
-      return
+      redirect('/auth/sign-in?message=You need to be logged in to like or review a recipe')
     }
 
     // Try both possible table names for likes
@@ -174,7 +174,9 @@ export default async function RecipeDetailsPage({
     const { data: { user: actionUser } } = await supabaseServer.auth.getUser()
     const recipeId = String(formData.get('recipe_id') || '')
     const content = String(formData.get('content') || '').trim()
-    if (!actionUser || !recipeId || !content) return
+    if (!actionUser || !recipeId || !content) {
+      redirect('/auth/sign-in?message=You need to be logged in to like or review a recipe')
+    }
     // Try common table names
     const tables = ['comments', 'recipe_comments']
     let inserted = false
@@ -248,6 +250,7 @@ export default async function RecipeDetailsPage({
             initialLiked={likedByUser}
             initialCount={likeCount ?? 0}
             action={toggleLike}
+            isAuthenticated={!!user}
           />
         </div>
 
@@ -312,11 +315,9 @@ export default async function RecipeDetailsPage({
         {/* Comments */}
         <div className="mt-12">
           <h2 className="text-2xl font-bold mb-4">Comments</h2>
-          {user && (
-            <div className="mb-6">
-              <CommentForm onSubmit={addComment} recipeId={String(recipe.id)} />
-            </div>
-          )}
+          <div className="mb-6">
+            <CommentForm onSubmit={addComment} recipeId={String(recipe.id)} isAuthenticated={!!user} />
+          </div>
           <div className="space-y-4">
             {comments?.length ? (
               comments.map((c: any) => (

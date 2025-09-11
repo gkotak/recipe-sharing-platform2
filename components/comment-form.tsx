@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button'
 type CommentFormProps = {
   onSubmit: (formData: FormData) => Promise<void>
   recipeId: string
+  isAuthenticated: boolean
 }
 
-export default function CommentForm({ onSubmit, recipeId }: CommentFormProps) {
+export default function CommentForm({ onSubmit, recipeId, isAuthenticated }: CommentFormProps) {
   const [content, setContent] = useState('')
   const [isPending, startTransition] = useTransition()
 
@@ -16,6 +17,10 @@ export default function CommentForm({ onSubmit, recipeId }: CommentFormProps) {
     <form
       action={(fd: FormData) => {
         if (!content.trim()) return
+        if (!isAuthenticated) {
+          // Let the server action handle the redirect
+          return
+        }
         startTransition(async () => {
           fd.set('recipe_id', recipeId)
           fd.set('content', content)
