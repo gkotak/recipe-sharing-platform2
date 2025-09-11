@@ -7,6 +7,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 import DeleteRecipeButton from '@/components/delete-recipe-button'
 import LikeButton from '@/components/like-button'
 import CommentForm from '@/components/comment-form'
@@ -56,12 +57,23 @@ export default async function RecipeDetailsPage({
 
   const likedByUser = !!userLike
 
-  // Fetch comments for this recipe (simple newest-first)
-  const { data: comments } = await supabase
-    .from('comments')
-    .select(`id, content, created_at, user_id, profiles: user_id ( full_name )`)
-    .eq('recipe_id', recipe.id)
-    .order('created_at', { ascending: false })
+  // Fetch comments for this recipe (simple newest-first), tolerate table name variations
+  let comments: any[] | null = null
+  {
+    const tryTables = ['comments', 'recipe_comments']
+    for (const tbl of tryTables) {
+      const { data, error } = await supabase
+        .from(tbl as any)
+        .select(`id, content, created_at, user_id, profiles: user_id ( full_name )`)
+        .eq('recipe_id', recipe.id)
+        .order('created_at', { ascending: false })
+      if (!error) {
+        comments = data as any[]
+        break
+      }
+    }
+    if (!comments) comments = []
+  }
 
   // Server action to delete a recipe (owner-only)
   async function deleteRecipe(formData: FormData) {
@@ -126,10 +138,17 @@ export default async function RecipeDetailsPage({
     const recipeId = String(formData.get('recipe_id') || '')
     const content = String(formData.get('content') || '').trim()
     if (!actionUser || !recipeId || !content) return
-    await supabaseServer
-      .from('comments')
-      .insert({ recipe_id: recipeId, user_id: actionUser.id, content })
-    // no redirect; client can rely on revalidation when navigating back or manual refresh
+    // Try common table names
+    const tables = ['comments', 'recipe_comments']
+    let inserted = false
+    for (const tbl of tables) {
+      const { error } = await supabaseServer
+        .from(tbl as any)
+        .insert({ recipe_id: recipeId, user_id: actionUser.id, content } as any)
+      if (!error) { inserted = true; break }
+    }
+    revalidatePath(`/recipes/${params.id}`)
+    redirect(`/recipes/${params.id}`)
   }
 
   // Server action: delete own comment
@@ -139,11 +158,18 @@ export default async function RecipeDetailsPage({
     const { data: { user: actionUser } } = await supabaseServer.auth.getUser()
     const commentId = String(formData.get('comment_id') || '')
     if (!actionUser || !commentId) return
-    await supabaseServer
-      .from('comments')
-      .delete()
-      .eq('id', commentId)
-      .eq('user_id', actionUser.id)
+    // Try common table names
+    const tables = ['comments', 'recipe_comments']
+    for (const tbl of tables) {
+      const { error } = await supabaseServer
+        .from(tbl as any)
+        .delete()
+        .eq('id', commentId)
+        .eq('user_id', actionUser.id)
+      if (!error) break
+    }
+    revalidatePath(`/recipes/${params.id}`)
+    redirect(`/recipes/${params.id}`)
   }
 
   const timeAgo = formatDistanceToNow(new Date(recipe.created_at), { addSuffix: true })
