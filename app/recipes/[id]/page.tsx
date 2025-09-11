@@ -39,40 +39,68 @@ export default async function RecipeDetailsPage({
   const { data: { user } } = await supabase.auth.getUser()
   const isOwner = !!user && user.id === recipe.user_id
 
-  // Likes: count + whether current user liked
-  const [{ count: likeCount }, { data: userLike }] = await Promise.all([
-    supabase
-      .from('recipe_likes')
-      .select('*', { count: 'exact', head: true })
-      .eq('recipe_id', recipe.id),
-    user
-      ? supabase
-          .from('recipe_likes')
-          .select('recipe_id')
-          .eq('recipe_id', recipe.id)
-          .eq('user_id', user.id)
-          .maybeSingle()
-      : Promise.resolve({ data: null } as any)
-  ])
+  // Likes: count + whether current user liked (try both table names)
+  let likeCount = 0
+  let userLike: any = null
+  
+  const likeTables = ['recipe_likes', 'likes']
+  for (const tbl of likeTables) {
+    const [{ count }, { data: like }] = await Promise.all([
+      supabase
+        .from(tbl as any)
+        .select('*', { count: 'exact', head: true })
+        .eq('recipe_id', recipe.id),
+      user
+        ? supabase
+            .from(tbl as any)
+            .select('recipe_id')
+            .eq('recipe_id', recipe.id)
+            .eq('user_id', user.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null } as any)
+    ])
+    
+    if (count !== null) {
+      likeCount = count
+      userLike = like
+      break
+    }
+  }
 
   const likedByUser = !!userLike
 
-  // Fetch comments for this recipe (simple newest-first), tolerate table name variations
-  let comments: any[] | null = null
+  // Fetch comments for this recipe (newest-first), tolerant to table name variations
+  let comments: any[] = []
+  let commentsTableUsed: string | null = null
   {
     const tryTables = ['comments', 'recipe_comments']
     for (const tbl of tryTables) {
       const { data, error } = await supabase
         .from(tbl as any)
-        .select(`id, content, created_at, user_id, profiles: user_id ( full_name )`)
+        .select('id, content, created_at, user_id, recipe_id')
         .eq('recipe_id', recipe.id)
         .order('created_at', { ascending: false })
-      if (!error) {
+      if (!error && data) {
         comments = data as any[]
+        commentsTableUsed = tbl
         break
       }
     }
-    if (!comments) comments = []
+  }
+
+  // Best-effort fetch of commenter names without relying on FK embed
+  let userIdToName: Record<string, string> = {}
+  if (comments.length > 0) {
+    const userIds = Array.from(new Set(comments.map((c: any) => c.user_id).filter(Boolean)))
+    if (userIds.length > 0) {
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds)
+      if (profilesData) {
+        userIdToName = Object.fromEntries(profilesData.map((p: any) => [p.id, p.full_name || 'Unknown']))
+      }
+    }
   }
 
   // Server action to delete a recipe (owner-only)
@@ -110,24 +138,33 @@ export default async function RecipeDetailsPage({
       return
     }
 
-    const { data: existing } = await supabaseServer
-      .from('recipe_likes')
-      .select('recipe_id')
-      .eq('recipe_id', recipeId)
-      .eq('user_id', actionUser.id)
-      .maybeSingle()
-
-    if (existing) {
-      await supabaseServer
-        .from('recipe_likes')
-        .delete()
+    // Try both possible table names for likes
+    const tables = ['recipe_likes', 'likes']
+    for (const tbl of tables) {
+      const { data: existing } = await supabaseServer
+        .from(tbl as any)
+        .select('recipe_id')
         .eq('recipe_id', recipeId)
         .eq('user_id', actionUser.id)
-    } else {
-      await supabaseServer
-        .from('recipe_likes')
-        .insert({ recipe_id: recipeId, user_id: actionUser.id })
+        .maybeSingle()
+
+      if (existing) {
+        await supabaseServer
+          .from(tbl as any)
+          .delete()
+          .eq('recipe_id', recipeId)
+          .eq('user_id', actionUser.id)
+      } else {
+        await supabaseServer
+          .from(tbl as any)
+          .insert({ recipe_id: recipeId, user_id: actionUser.id } as any)
+      }
+      // If we get here without error, we found the right table
+      break
     }
+
+    // Revalidate the page to ensure the like count updates
+    revalidatePath(`/recipes/${params.id}`)
   }
 
   // Server action: add comment
@@ -148,7 +185,6 @@ export default async function RecipeDetailsPage({
       if (!error) { inserted = true; break }
     }
     revalidatePath(`/recipes/${params.id}`)
-    redirect(`/recipes/${params.id}`)
   }
 
   // Server action: delete own comment
@@ -169,7 +205,6 @@ export default async function RecipeDetailsPage({
       if (!error) break
     }
     revalidatePath(`/recipes/${params.id}`)
-    redirect(`/recipes/${params.id}`)
   }
 
   const timeAgo = formatDistanceToNow(new Date(recipe.created_at), { addSuffix: true })
@@ -288,7 +323,7 @@ export default async function RecipeDetailsPage({
                 <div key={c.id} className="rounded-lg border p-4">
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-muted-foreground">
-                      <span>{c.profiles?.full_name || 'Unknown'}</span>
+                      <span>{userIdToName[c.user_id] || 'Unknown'}</span>
                       <span className="mx-2">•</span>
                       <span>{formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}</span>
                     </div>
