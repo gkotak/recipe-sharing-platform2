@@ -1,16 +1,10 @@
 import Link from 'next/link'
 import { Clock, ChefHat, Tag } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
-import { Database } from '@/lib/supabase/types'
-
-type Recipe = Database['public']['Tables']['recipes']['Row'] & {
-  profiles: {
-    full_name: string | null
-  } | null
-}
+import { RecipeWithProfile } from '@/lib/types'
 
 interface RecipeCardProps {
-  recipe: Recipe
+  recipe: RecipeWithProfile
 }
 
 export default function RecipeCard({ recipe }: RecipeCardProps) {

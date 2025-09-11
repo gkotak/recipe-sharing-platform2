@@ -1,18 +1,11 @@
-import { Database } from '@/lib/supabase/types'
 import RecipeCard from './recipe-card'
-
-type Recipe = Database['public']['Tables']['recipes']['Row'] & {
-  profiles: {
-    full_name: string | null
-  } | null
-}
+import { RecipeWithProfile } from '@/lib/types'
 
 interface RecipeGridProps {
-  recipes: Recipe[]
+  recipes: RecipeWithProfile[]
 }
 
 export default function RecipeGrid({ recipes }: RecipeGridProps) {
-  console.log('RecipeGrid received recipes:', recipes) // Debug log
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -7,6 +7,8 @@ import { PlusCircle } from 'lucide-react'
 import { Suspense } from 'react'
 import { RecipeGridSkeleton } from '@/components/skeletons/recipe-grid-skeleton'
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardPage() {
   const supabase = createClient()
 

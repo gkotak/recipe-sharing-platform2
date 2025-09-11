@@ -13,9 +13,22 @@ export default function CommentForm({ onSubmit, recipeId, isAuthenticated }: Com
   const [content, setContent] = useState('')
   const [isPending, startTransition] = useTransition()
 
+  const handleSubmit = (formData: FormData) => {
+    if (isAuthenticated && content.trim()) {
+      startTransition(async () => {
+        try {
+          await onSubmit(formData)
+          setContent('')
+        } catch (error) {
+          console.error('Error submitting comment:', error)
+        }
+      })
+    }
+  }
+
   return (
     <form
-      action={onSubmit}
+      action={handleSubmit}
       className="space-y-2"
     >
       <input type="hidden" name="recipe_id" value={recipeId} />
@@ -31,12 +44,6 @@ export default function CommentForm({ onSubmit, recipeId, isAuthenticated }: Com
         <Button 
           type="submit" 
           disabled={isPending || !content.trim()}
-          onClick={() => {
-            console.log('CommentForm clicked, isAuthenticated:', isAuthenticated, 'content:', content)
-            if (isAuthenticated && content.trim()) {
-              setContent('')
-            }
-          }}
         >
           {isPending ? 'Posting...' : 'Post Comment'}
         </Button>

@@ -11,6 +11,11 @@ import { revalidatePath } from 'next/cache'
 import DeleteRecipeButton from '@/components/delete-recipe-button'
 import LikeButton from '@/components/like-button'
 import CommentForm from '@/components/comment-form'
+import { tryTableVariations, tryTableVariationsMutation } from '@/lib/utils/table-resolution'
+import { getCurrentUser, requireAuth, AUTH_MESSAGES } from '@/lib/utils/auth-server'
+import { handleSupabaseError } from '@/lib/utils/error-handling'
+
+export const dynamic = 'force-dynamic'
 
 export default async function RecipeDetailsPage({
   params
@@ -36,56 +41,60 @@ export default async function RecipeDetailsPage({
   }
 
   // Determine ownership
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   const isOwner = !!user && user.id === recipe.user_id
 
-  // Likes: count + whether current user liked (try both table names)
+  // Likes: count + whether current user liked
   let likeCount = 0
   let userLike: any = null
   
-  const likeTables = ['recipe_likes', 'likes']
-  for (const tbl of likeTables) {
-    const [{ count }, { data: like }] = await Promise.all([
-      supabase
-        .from(tbl as any)
-        .select('*', { count: 'exact', head: true })
-        .eq('recipe_id', recipe.id),
-      user
-        ? supabase
-            .from(tbl as any)
-            .select('recipe_id')
-            .eq('recipe_id', recipe.id)
-            .eq('user_id', user.id)
-            .maybeSingle()
-        : Promise.resolve({ data: null } as any)
-    ])
-    
-    if (count !== null) {
-      likeCount = count
-      userLike = like
-      break
+  const { data: likeData } = await tryTableVariations(
+    supabase,
+    'likes',
+    async (tableName) => {
+      const [{ count }, { data: like }] = await Promise.all([
+        supabase
+          .from(tableName as any)
+          .select('*', { count: 'exact', head: true })
+          .eq('recipe_id', recipe.id),
+        user
+          ? supabase
+              .from(tableName as any)
+              .select('recipe_id')
+              .eq('recipe_id', recipe.id)
+              .eq('user_id', user.id)
+              .maybeSingle()
+          : Promise.resolve({ data: null } as any)
+      ])
+      
+      return { data: { count, like }, error: null }
     }
+  )
+  
+  if (likeData && typeof likeData === 'object' && 'count' in likeData) {
+    likeCount = (likeData as any).count || 0
+    userLike = (likeData as any).like
   }
 
   const likedByUser = !!userLike
 
   // Fetch comments directly - RLS should allow public read access
   let comments: any[] = []
-  let commentsTableUsed: string | null = null
   
-  const tryTables = ['comments', 'recipe_comments']
-  for (const tbl of tryTables) {
-    const { data, error } = await supabase
-      .from(tbl as any)
-      .select('id, content, created_at, user_id, recipe_id')
-      .eq('recipe_id', recipe.id)
-      .order('created_at', { ascending: false })
-    
-    if (!error && data) {
-      comments = data as any[]
-      commentsTableUsed = tbl
-      break
+  const { data: commentsData } = await tryTableVariations(
+    supabase,
+    'comments',
+    async (tableName) => {
+      return await supabase
+        .from(tableName as any)
+        .select('id, content, created_at, user_id, recipe_id')
+        .eq('recipe_id', recipe.id)
+        .order('created_at', { ascending: false })
     }
+  )
+  
+  if (commentsData) {
+    comments = commentsData as any[]
   }
 
   // Fetch commenter names
@@ -108,11 +117,11 @@ export default async function RecipeDetailsPage({
   async function deleteRecipe(formData: FormData) {
     'use server'
     const supabaseServer = createClient()
-    const { data: { user: actionUser } } = await supabaseServer.auth.getUser()
+    const actionUser = await requireAuth('You need to be logged in to delete recipes')
     const recipeId = formData.get('recipe_id')
 
-    if (!actionUser || !recipeId) {
-      redirect(`/recipes/${params.id}`)
+    if (!recipeId) {
+      throw new Error('Recipe ID is required')
     }
 
     const { error: deleteError } = await supabaseServer
@@ -122,8 +131,7 @@ export default async function RecipeDetailsPage({
       .eq('user_id', actionUser.id)
 
     if (deleteError) {
-      console.error('Delete error:', deleteError)
-      redirect(`/recipes/${params.id}?error=cannot_delete`)
+      throw new Error(handleSupabaseError(deleteError))
     }
 
     redirect('/dashboard')
@@ -132,39 +140,52 @@ export default async function RecipeDetailsPage({
   // Server action to toggle like
   async function toggleLike(formData: FormData) {
     'use server'
-    console.log('toggleLike server action called')
     const supabaseServer = createClient()
-    const { data: { user: actionUser } } = await supabaseServer.auth.getUser()
+    const actionUser = await requireAuth(AUTH_MESSAGES.LIKE_REQUIRED)
     const recipeId = String(formData.get('recipe_id') || '')
-    console.log('toggleLike - user:', !!actionUser, 'recipeId:', recipeId)
-    if (!actionUser || !recipeId) {
-      console.log('redirecting to sign-in')
-      redirect('/auth/sign-in?message=You need to be logged in to like or review a recipe')
+    
+    if (!recipeId) {
+      throw new Error('Recipe ID is required')
     }
 
-    // Try both possible table names for likes
-    const tables = ['recipe_likes', 'likes']
-    for (const tbl of tables) {
-      const { data: existing } = await supabaseServer
-        .from(tbl as any)
-        .select('recipe_id')
-        .eq('recipe_id', recipeId)
-        .eq('user_id', actionUser.id)
-        .maybeSingle()
-
-      if (existing) {
-        await supabaseServer
-          .from(tbl as any)
-          .delete()
+    // Check if like already exists
+    const { data: existing } = await tryTableVariations(
+      supabaseServer,
+      'likes',
+      async (tableName) => {
+        return await supabaseServer
+          .from(tableName as any)
+          .select('recipe_id')
           .eq('recipe_id', recipeId)
           .eq('user_id', actionUser.id)
-      } else {
-        await supabaseServer
-          .from(tbl as any)
-          .insert({ recipe_id: recipeId, user_id: actionUser.id } as any)
+          .maybeSingle()
       }
-      // If we get here without error, we found the right table
-      break
+    )
+
+    if (existing) {
+      // Unlike: delete the like
+      await tryTableVariationsMutation(
+        supabaseServer,
+        'likes',
+        async (tableName) => {
+          return await supabaseServer
+            .from(tableName as any)
+            .delete()
+            .eq('recipe_id', recipeId)
+            .eq('user_id', actionUser.id)
+        }
+      )
+    } else {
+      // Like: insert the like
+      await tryTableVariationsMutation(
+        supabaseServer,
+        'likes',
+        async (tableName) => {
+          return await supabaseServer
+            .from(tableName as any)
+            .insert({ recipe_id: recipeId, user_id: actionUser.id } as any)
+        }
+      )
     }
 
     // Revalidate the page to ensure the like count updates
@@ -174,45 +195,63 @@ export default async function RecipeDetailsPage({
   // Server action: add comment
   async function addComment(formData: FormData) {
     'use server'
-    console.log('addComment server action called')
-    const supabaseServer = createClient()
-    const { data: { user: actionUser } } = await supabaseServer.auth.getUser()
-    const recipeId = String(formData.get('recipe_id') || '')
-    const content = String(formData.get('content') || '').trim()
-    console.log('addComment - user:', !!actionUser, 'recipeId:', recipeId, 'content:', content)
-    if (!actionUser || !recipeId || !content) {
-      console.log('redirecting to sign-in')
-      redirect('/auth/sign-in?message=You need to be logged in to like or review a recipe')
+    try {
+      const supabaseServer = createClient()
+      const actionUser = await requireAuth(AUTH_MESSAGES.LIKE_REQUIRED)
+      const recipeId = String(formData.get('recipe_id') || '')
+      const content = String(formData.get('content') || '').trim()
+      
+      console.log('Comment submission:', { recipeId, content, userId: actionUser.id })
+      
+      if (!recipeId || !content) {
+        throw new Error('Recipe ID and content are required')
+      }
+      
+      const success = await tryTableVariationsMutation(
+        supabaseServer,
+        'comments',
+        async (tableName) => {
+          console.log('Inserting comment into table:', tableName)
+          return await supabaseServer
+            .from(tableName as any)
+            .insert({ recipe_id: recipeId, user_id: actionUser.id, content } as any)
+        }
+      )
+
+      if (!success) {
+        throw new Error('Failed to insert comment')
+      }
+
+      console.log('Comment inserted successfully')
+      revalidatePath(`/recipes/${params.id}`)
+    } catch (error) {
+      console.error('Error in addComment:', error)
+      throw error
     }
-    // Try common table names
-    const tables = ['comments', 'recipe_comments']
-    let inserted = false
-    for (const tbl of tables) {
-      const { error } = await supabaseServer
-        .from(tbl as any)
-        .insert({ recipe_id: recipeId, user_id: actionUser.id, content } as any)
-      if (!error) { inserted = true; break }
-    }
-    revalidatePath(`/recipes/${params.id}`)
   }
 
   // Server action: delete own comment
   async function deleteComment(formData: FormData) {
     'use server'
     const supabaseServer = createClient()
-    const { data: { user: actionUser } } = await supabaseServer.auth.getUser()
+    const actionUser = await requireAuth('You need to be logged in to delete comments')
     const commentId = String(formData.get('comment_id') || '')
-    if (!actionUser || !commentId) return
-    // Try common table names
-    const tables = ['comments', 'recipe_comments']
-    for (const tbl of tables) {
-      const { error } = await supabaseServer
-        .from(tbl as any)
-        .delete()
-        .eq('id', commentId)
-        .eq('user_id', actionUser.id)
-      if (!error) break
+    
+    if (!commentId) {
+      throw new Error('Comment ID is required')
     }
+    await tryTableVariationsMutation(
+      supabaseServer,
+      'comments',
+      async (tableName) => {
+        return await supabaseServer
+          .from(tableName as any)
+          .delete()
+          .eq('id', commentId)
+          .eq('user_id', actionUser.id)
+      }
+    )
+
     revalidatePath(`/recipes/${params.id}`)
   }
 

@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { useSupabase } from './providers/supabase-provider'
 import { CategorySelect } from './category-select'
 import { RecipeCategory } from '@/lib/constants/categories'
+import { handleAuthError, handleSupabaseError, validateRequiredFields } from '@/lib/utils/error-handling'
+import { AUTH_MESSAGES } from '@/lib/utils/auth-client'
 
 export default function RecipeForm() {
   const router = useRouter()
@@ -47,28 +49,23 @@ export default function RecipeForm() {
     setError(null)
 
     try {
+      // Validate required fields
+      const validationError = validateRequiredFields(formData, ['title', 'description', 'category'])
+      if (validationError) {
+        throw new Error(validationError)
+      }
+
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser()
       
       if (userError) {
-        console.error('Auth error:', userError)
-        throw new Error('Authentication error')
+        throw new Error(handleAuthError(userError))
       }
 
       if (!user) {
-        throw new Error('User not authenticated')
+        throw new Error(AUTH_MESSAGES.LOGIN_REQUIRED)
       }
 
-      // Log the data we're about to send
-      console.log('Submitting recipe:', {
-        title: formData.title,
-        description: formData.description,
-        ingredients: formData.ingredients.filter(i => i.trim() !== ''),
-        cooking_time: parseInt(formData.cooking_time),
-        difficulty: formData.difficulty,
-        category: formData.category,
-        user_id: user.id
-      })
 
       // Insert the recipe
       const { data, error: insertError } = await supabase
@@ -87,11 +84,9 @@ export default function RecipeForm() {
         .single()
 
       if (insertError) {
-        console.error('Insert error:', insertError)
-        throw new Error(insertError.message)
+        throw new Error(handleSupabaseError(insertError))
       }
 
-      console.log('Recipe created:', data)
 
       // Navigate back to dashboard
       router.push('/dashboard')

@@ -12,11 +12,6 @@ export const createClient = () => {
       throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_ANON_KEY')
     }
 
-    // Log the URL we're trying to connect to (remove in production)
-    console.log('Attempting to connect to Supabase:', {
-      url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    })
 
     return createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -43,7 +38,6 @@ export const createClient = () => {
         },
         global: {
           fetch: (url, init) => {
-            console.log('Fetching:', url) // Debug log
             return fetch(url, {
               ...init,
               cache: 'no-store',

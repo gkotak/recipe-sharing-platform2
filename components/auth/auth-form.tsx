@@ -5,25 +5,10 @@ import { Button } from '@/components/ui/button'
 import { useSupabase } from '@/components/providers/supabase-provider'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, CheckCircle2 } from 'lucide-react'
+import { AuthMode } from '@/lib/types'
+import { handleAuthError, validateRequiredFields } from '@/lib/utils/error-handling'
+import { AUTH_MESSAGES, validatePassword } from '@/lib/utils/auth-client'
 
-type AuthMode = 'sign-in' | 'sign-up'
-
-function validatePassword(password: string) {
-  const hasUpperCase = /[A-Z]/.test(password)
-  const hasNumber = /[0-9]/.test(password)
-  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password)
-
-  const missing = []
-  if (!hasUpperCase) missing.push("uppercase letter")
-  if (!hasNumber) missing.push("number")
-  if (!hasSpecialChar) missing.push("special character")
-  
-  if (missing.length > 0) {
-    throw new Error(
-      `Password must contain at least one ${missing.join(", one ")}.`
-    )
-  }
-}
 
 export default function AuthForm() {
   const [mode, setMode] = useState<AuthMode>('sign-in')
@@ -51,7 +36,6 @@ export default function AuthForm() {
           throw validationError
         }
         
-        console.log('Attempting sign up with:', { email, fullName })
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -61,13 +45,9 @@ export default function AuthForm() {
           },
         })
         
-        console.log('Sign up response:', {
-          user: data.user,
-          session: data.session,
-          error: signUpError
-        })
-        
-        if (signUpError) throw signUpError
+        if (signUpError) {
+          throw new Error(handleAuthError(signUpError))
+        }
         
         if (!data.user) {
           throw new Error('Failed to create user account')
@@ -79,7 +59,9 @@ export default function AuthForm() {
           email,
           password,
         })
-        if (signInError) throw signInError
+        if (signInError) {
+          throw new Error(handleAuthError(signInError))
+        }
         
         if (!data.user?.email_confirmed_at) {
           throw new Error('Please verify your email before signing in.')

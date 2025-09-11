@@ -4,15 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useSupabase } from './providers/supabase-provider'
-
-interface Profile {
-  id: string
-  username: string | null
-  full_name: string | null
-  bio: string | null
-  created_at: string
-  updated_at: string
-}
+import { Profile } from '@/lib/types'
 
 interface ProfileFormProps {
   initialProfile: Profile | null

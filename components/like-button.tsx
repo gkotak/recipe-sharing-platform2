@@ -29,7 +29,6 @@ export default function LikeButton({ recipeId, initialLiked, initialCount, actio
         disabled={isPending} 
         className="gap-2"
         onClick={() => {
-          console.log('LikeButton clicked, isAuthenticated:', isAuthenticated)
           if (isAuthenticated) {
             // optimistic update only for authenticated users
             setState({ liked: !state.liked, count: state.liked ? state.count - 1 : state.count + 1 })

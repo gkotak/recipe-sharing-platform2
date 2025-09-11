@@ -1,12 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { CATEGORY_GROUPS, ALL_CATEGORIES, type RecipeCategory, getCategoryLabel } from '@/lib/constants/categories'
 import BrowseContent from '@/components/browse-content'
+import { RecipeWithProfile } from '@/lib/types'
 
-type Recipe = import('@/lib/supabase/types').Database['public']['Tables']['recipes']['Row'] & {
-  profiles: {
-    full_name: string | null
-  } | null
-}
+export const dynamic = 'force-dynamic'
 
 export default async function BrowsePage() {
   const supabase = createClient()
@@ -15,7 +12,7 @@ export default async function BrowsePage() {
   const limitPerCategory = 6
 
   // Use a plain object (with default prototype) to avoid serialization issues to Client Components
-  const categoryToRecipes: Record<RecipeCategory, Recipe[]> = {} as Record<RecipeCategory, Recipe[]>
+  const categoryToRecipes: Record<RecipeCategory, RecipeWithProfile[]> = {} as Record<RecipeCategory, RecipeWithProfile[]>
 
   for (const { value } of ALL_CATEGORIES) {
     const { data, error } = await supabase
@@ -31,7 +28,7 @@ export default async function BrowsePage() {
       .limit(limitPerCategory)
 
     if (!error && data) {
-      categoryToRecipes[value] = data as unknown as Recipe[]
+      categoryToRecipes[value] = data as unknown as RecipeWithProfile[]
     } else {
       categoryToRecipes[value] = []
     }

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import RecipeForm from '@/components/recipe-form'
 
+export const dynamic = 'force-dynamic'
+
 export default async function CreateRecipePage({
   searchParams
 }: {
@@ -35,7 +37,7 @@ export default async function CreateRecipePage({
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">{isEdit ? 'Edit Recipe' : 'Create New Recipe'}</h1>
-        <RecipeForm initialData={recipeToEdit} recipeId={recipeToEdit?.id} />
+        <RecipeForm />
       </div>
     </div>
   )

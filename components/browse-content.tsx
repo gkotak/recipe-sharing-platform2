@@ -7,21 +7,16 @@ import RecipeGrid from '@/components/recipe-grid'
 import { CATEGORY_GROUPS, type RecipeCategory } from '@/lib/constants/categories'
 import { useDebounce } from '@/lib/hooks/use-debounce'
 import { createClient } from '@/lib/supabase/client'
-
-type Recipe = import('@/lib/supabase/types').Database['public']['Tables']['recipes']['Row'] & {
-  profiles: {
-    full_name: string | null
-  } | null
-}
+import { RecipeWithProfile } from '@/lib/types'
 
 interface BrowseContentProps {
-  categoryToRecipes: Record<RecipeCategory, Recipe[]>
+  categoryToRecipes: Record<RecipeCategory, RecipeWithProfile[]>
 }
 
 export default function BrowseContent({ categoryToRecipes }: BrowseContentProps) {
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebounce(query, 300)
-  const [results, setResults] = useState<Recipe[] | null>(null)
+  const [results, setResults] = useState<RecipeWithProfile[] | null>(null)
 
   useEffect(() => {
     const run = async () => {
@@ -47,7 +42,7 @@ export default function BrowseContent({ categoryToRecipes }: BrowseContentProps)
         console.error('Search error:', error)
         return
       }
-      setResults((data || []) as unknown as Recipe[])
+      setResults((data || []) as unknown as RecipeWithProfile[])
     }
     run()
   }, [debouncedQuery])
