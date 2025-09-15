@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
-import { Search, User } from "lucide-react"
+import { Search, User, Wallet } from "lucide-react"
 import { useSupabase } from "@/components/providers/supabase-provider"
 import { useRouter } from "next/navigation"
 
@@ -27,6 +27,11 @@ export default function Navbar() {
             <Link href="/browse" className="text-sm font-medium transition-colors hover:text-primary">
               Browse
             </Link>
+            {session && (
+              <Link href="/payment" className="text-sm font-medium transition-colors hover:text-primary">
+                Credits
+              </Link>
+            )}
           </div>
         </div>
         <div className="ml-auto flex items-center space-x-4">
@@ -36,6 +41,11 @@ export default function Navbar() {
           <ModeToggle />
           {session ? (
             <>
+              <Button variant="ghost" size="icon" asChild>
+                <Link href="/payment">
+                  <Wallet className="h-5 w-5" />
+                </Link>
+              </Button>
               <Button variant="ghost" size="icon" asChild>
                 <Link href="/profile">
                   <User className="h-5 w-5" />
